@@ -3,8 +3,8 @@ struct rtcdate;
 
 // system calls
 int fork(void);
-int exit(int) __attribute__((noreturn)); // original: int exit(void) // modified for cs 153 lab 1
-int wait(void);
+int exit(int) __attribute__((noreturn)); // original: "int exit(void)" ... // CS 153 lab 1 part a
+int wait(int*); // Original: "int wait(void);" // CS 153 Lab 1 Part b
 int pipe(int*);
 int write(int, const void*, int);
 int read(int, void*, int);
@@ -24,6 +24,7 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 int hello(void);
+int waitpid(int, int*, int);
 
 // ulib.c
 int stat(const char*, struct stat*);

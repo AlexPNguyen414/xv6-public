@@ -7,14 +7,14 @@ int main(int argc, char *argv[])
 {
 	
 	int exitWait(void);
-	//int waitPid(void);
+	int waitPid(void);            
 
   printf(1, "\n This program tests the correctness of your lab#1\n");
   
   if (atoi(argv[1]) == 1)
 	exitWait();
-  else if (atoi(argv[1]) == 2)
-	//waitPid();
+  else if (atoi(argv[1]) == 2)  
+	waitPid();                    
   else 
    printf(1, "\ntype \"%s 1\" to test exit and wait, \"%s 2\" to test waitpid\n", argv[0], argv[0]);
   
@@ -52,7 +52,7 @@ int exitWait(void) {
   return 0;
 }
 
-/*
+
 int waitPid(void){
 	
   int ret_pid, exit_status;
@@ -102,4 +102,3 @@ int waitPid(void){
 
   return 0;
 }
-*/

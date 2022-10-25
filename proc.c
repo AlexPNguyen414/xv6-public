@@ -226,7 +226,7 @@ fork(void)
 // until its parent calls wait() to find out it exited.
 // cs 153 lab 1: edited exit to include exit(status)
 void
-exit(int status)
+exit(int status)  // Original: "exit(void)" // CS 153 Lab 1 Part a
 {
   struct proc *curproc = myproc();
   struct proc *p;
@@ -262,16 +262,26 @@ exit(int status)
     }
   }
 
+  // sets status to input argument // cs 153 lab 1 part a
+  curproc->status = status; 
+  // cprintf("\nExits with status: %d\n", status);  // debug: status
+
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
   sched();
   panic("zombie exit");
 }
 
+/*
+* Cite: additional help and information for understanding how wait() function
+* and exit() function work was retrieved from the following online lecture:
+* https://www.youtube.com/watch?v=ZHc8CHqi3Ws
+*/
+
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
-wait(void)
+wait(int *status)
 {
   struct proc *p;
   int havekids, pid;
@@ -288,6 +298,10 @@ wait(void)
       if(p->state == ZOMBIE){
         // Found one.
         pid = p->pid;
+        // gets child exit status // cs 153 lab 1 part b
+        if(status) {
+          *status = p->status;
+        }
         kfree(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir);
@@ -296,6 +310,7 @@ wait(void)
         p->name[0] = 0;
         p->killed = 0;
         p->state = UNUSED;
+        p->status = 0;      // resets to 0 // cs 153 lab 1 part a
         release(&ptable.lock);
         return pid;
       }
@@ -303,6 +318,82 @@ wait(void)
 
     // No point waiting if we don't have any children.
     if(!havekids || curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+
+    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
+    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
+  }
+}
+
+// CS 153 Lab 1 Part c
+// I copied the content of the wait() function and modified it to look for the inpid in addition to ZOMBIE children
+int
+waitpid(int inpid, int *status, int options)
+{
+  struct proc *p;
+  int pidNotFound, pid; // pidNotFound used to store whether pid is found or not, 0 for found, 1 for not found.
+  struct proc *curproc = myproc();
+
+  // if the current process has the matching pid, returns and does not wait for itself
+  if(curproc->pid == inpid) {
+    pid = curproc->pid;
+    return pid;
+  }
+  
+  acquire(&ptable.lock);
+  for(;;){
+    // Scan through table looking for process with matching pid.
+    pidNotFound = 1;
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      // skips current process if pid does not match
+      if(p->pid != inpid)
+        continue;
+
+      pidNotFound = 0;
+      // cprintf("\nFound matching pid. inpid: %d , p->pid: %d.\n", inpid, p->pid); // debug statement
+
+      /*  DOES NOT WORK
+      // added if-statement // looks for matching pid
+      if(p->pid == inpid) {
+        pid = p->pid;
+        cprintf("\nFound matching pid. inpid: %d , p->pid: %d , return pid: %d .\n", inpid, p->pid, pid); // debug statement
+        // copies exit status out to argument
+        if(status) {
+          *status = p->status;
+        }  
+        // wait for process
+        // cprintf("\ncurproc will sleep now\n");  // debug statement
+        sleep(curproc, &ptable.lock);
+        return pid;
+      }
+      */
+
+      // if child is a ZOMBIE, same as wait() function
+      if(p->state == ZOMBIE){
+        // Found one.
+        pid = p->pid;
+        // gets child exit status // cs 153 lab 1 part b
+        if(status) {
+          *status = p->status;
+        }     
+        kfree(p->kstack);
+        p->kstack = 0;
+        freevm(p->pgdir);
+        p->pid = 0;
+        p->parent = 0;
+        p->name[0] = 0;
+        p->killed = 0;
+        p->state = UNUSED;
+        p->status = 0;      // resets to 0 // cs 153 lab 1 part a
+        release(&ptable.lock);
+        return pid;
+      } 
+    }
+    
+    // No point waiting if we don't have matching pid.
+    if(pidNotFound || curproc->killed){
       release(&ptable.lock);
       return -1;
     }
@@ -539,4 +630,6 @@ void
 hello (void) 
 {
   cprintf("\n\n Hello from kernel space! \n\n");
+  int *status;
+  cprintf("size of status: %d\n" , sizeof(status));
 }

@@ -21,3 +21,4 @@
 #define SYS_mkdir  20
 #define SYS_close  21
 #define SYS_hello  22
+#define SYS_waitpid  23 // CS 153 Lab 1 Part c
