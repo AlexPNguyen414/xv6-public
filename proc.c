@@ -224,8 +224,9 @@ fork(void)
 // Exit the current process.  Does not return.
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
+// cs 153 lab 1: edited exit to include exit(status)
 void
-exit(void)
+exit(int status)
 {
   struct proc *curproc = myproc();
   struct proc *p;
@@ -531,4 +532,11 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+// cs153 lab 1
+void
+hello (void) 
+{
+  cprintf("\n\n Hello from kernel space! \n\n");
 }

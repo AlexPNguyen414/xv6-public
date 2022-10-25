@@ -89,3 +89,11 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// hello() function for cs153 lab1
+int
+sys_hello(void) 
+{
+  hello();
+  return 0;
+}
