@@ -23,6 +23,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int set_prior(int); // cs153 lab2 part2
 
 // ulib.c
 int stat(const char*, struct stat*);

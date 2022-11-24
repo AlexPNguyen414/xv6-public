@@ -88,6 +88,9 @@ allocproc(void)
 found:
   p->state = EMBRYO;
   p->pid = nextpid++;
+  p->prior_val = 10;  // cs153 lab2 part1
+  p->start_burst = 0;  // cs153 lab2 part5
+  p->finish_burst = 0;  // cs153 lab2 part5
 
   release(&ptable.lock);
 
@@ -150,6 +153,11 @@ userinit(void)
 
   p->state = RUNNABLE;
 
+  // cs153 lab2 part5
+  acquire(&tickslock);
+  p->start_burst = ticks;
+  release(&tickslock);
+
   release(&ptable.lock);
 }
 
@@ -196,6 +204,7 @@ fork(void)
     np->state = UNUSED;
     return -1;
   }
+  np->prior_val = curproc->prior_val; // cs153 lab2 part1
   np->sz = curproc->sz;
   np->parent = curproc;
   *np->tf = *curproc->tf;
@@ -215,6 +224,11 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  
+  // cs153 lab2 part5
+  acquire(&tickslock);
+  np->start_burst = ticks;
+  release(&tickslock);
 
   release(&ptable.lock);
 
@@ -259,7 +273,20 @@ exit(void)
       if(p->state == ZOMBIE)
         wakeup1(initproc);
     }
-  }
+  }  
+
+  // cs153 lab2 part5
+  acquire(&tickslock);
+  curproc->finish_time = ticks;
+  release(&tickslock);
+
+  // calculates turnaround time, burst time, and waiting time
+  int turnaround_time = curproc->finish_time - curproc->start_time;
+  int burst_time = curproc->finish_burst - curproc->start_burst;
+  int waiting_time = turnaround_time - burst_time;
+  cprintf("Turnaround time of process with PID# %d is: %d\n" , curproc->pid, turnaround_time);
+  cprintf("Burst time of process with PID# %d is: %d\n" , curproc->pid, burst_time);
+  cprintf("Waiting time of process with PID# %d is: %d\n\n" , curproc->pid, waiting_time);
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
@@ -325,17 +352,57 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
+  struct proc *p1;  // for the highest priority loop
+  struct proc *p2;  // for the decreasing priority loop
   
   for(;;){
     // Enable interrupts on this processor.
     sti();
 
-    // Loop over process table looking for process to run.
+    struct proc *highest_p; // used to store proc with highest priority
+
+    // Loop over process table looking for highest priority value.
     acquire(&ptable.lock);
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
+      if(p->state != RUNNABLE) {
         continue;
+      }
 
+      highest_p = p;
+
+      // Find the highest priority value (0 is highest, 31 is lowest)
+      // by comparing highest_p with the rest
+      // cs153 lab2 part3
+      for(p1 = ptable.proc; p1 < &ptable.proc[NPROC]; p1++){
+        if(p1->state != RUNNABLE) {
+          continue;
+        }
+        if(p1->prior_val < highest_p->prior_val) {
+          highest_p = p1;
+        }
+      }
+
+      p = highest_p;  // current proc now has the highest priority
+
+      // Decrease priority value (0 is highest, 31 is lowest)
+      // for any proc that is not highest_p and whose
+      // priority is not already the highest possible
+      // cs153 lab2 part4
+      for(p2 = ptable.proc; p2 < &ptable.proc[NPROC]; p2++){
+        if(p2->state != RUNNABLE) {
+          continue;
+        }
+        if((p2 != highest_p) && (p2->prior_val > 0)) {
+          p2->prior_val = p2->prior_val - 1;
+        }
+      }
+
+      // Increase priority value of running proc (0 is highest, 31 is lowest)
+      // cs153 lab2 part4
+      if(p->prior_val < 31) {
+        p->prior_val = p->prior_val + 1;
+      }
+       
       // Switch to chosen process.  It is the process's job
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
@@ -343,6 +410,11 @@ scheduler(void)
       switchuvm(p);
       p->state = RUNNING;
 
+      // cs153 lab2 part5
+      acquire(&tickslock);
+      p->finish_burst = ticks;
+      release(&tickslock);   
+      
       swtch(&(c->scheduler), p->context);
       switchkvm();
 
@@ -351,7 +423,6 @@ scheduler(void)
       c->proc = 0;
     }
     release(&ptable.lock);
-
   }
 }
 
@@ -439,6 +510,11 @@ sleep(void *chan, struct spinlock *lk)
   p->chan = chan;
   p->state = SLEEPING;
 
+  // cs153 lab2 part5
+  acquire(&tickslock);
+  p->finish_burst = ticks;
+  release(&tickslock);
+
   sched();
 
   // Tidy up.
@@ -460,8 +536,15 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan) {
       p->state = RUNNABLE;
+
+      // cs153 lab2 part5
+      acquire(&tickslock);
+      p->start_burst = ticks;
+      release(&tickslock);
+    }
+      
 }
 
 // Wake up all processes sleeping on chan.
@@ -486,8 +569,15 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING) {
         p->state = RUNNABLE;
+
+        // cs153 lab2 part5
+        acquire(&tickslock);
+        p->start_burst = ticks;
+        release(&tickslock);
+      }
+        
       release(&ptable.lock);
       return 0;
     }
@@ -531,4 +621,15 @@ procdump(void)
     }
     cprintf("\n");
   }
+}
+
+// cs153 lab2 part2
+// change the priority value of the current proc
+void
+set_prior(int prior_lvl)
+{
+  struct proc *curproc = myproc();
+
+  // legal range of prior_val: [0,31]
+  curproc->prior_val = prior_lvl % 32;
 }

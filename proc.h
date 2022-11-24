@@ -49,6 +49,11 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  int prior_val;               // Priority value for scheduler, 0 is highest, 31 is lowest // cs153 lab2 part1
+  uint start_time;             // Start time from exec() // cs153 lab2 part5
+  uint finish_time;            // Finish time from exit() // cs153 lab2 part5
+  uint start_burst;            // Start burst time // cs153 lab2 part5
+  uint finish_burst;           // Finish burst time // cs153 lab2 part5
 };
 
 // Process memory is laid out contiguously, low addresses first:

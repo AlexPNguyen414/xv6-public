@@ -89,3 +89,17 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// cs153 lab2 part2
+// change priority value
+int
+sys_set_prior(void)
+{
+  int prior_lvl;
+  if(argint(0, &prior_lvl) < 0) {
+    return -1;
+  }
+
+  set_prior(prior_lvl);
+  return 0;
+}

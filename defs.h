@@ -120,6 +120,7 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void            set_prior(int); // cs153 lab2 part2
 
 // swtch.S
 void            swtch(struct context**, struct context*);
