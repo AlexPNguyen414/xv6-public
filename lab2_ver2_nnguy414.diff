@@ -1,0 +1,794 @@
+diff --git a/Makefile b/Makefile
+index 09d790c..391353a 100644
+--- a/Makefile
++++ b/Makefile
+@@ -181,6 +181,7 @@ UPROGS=\
+ 	_usertests\
+ 	_wc\
+ 	_zombie\
++	_lab2_test\
+ 
+ fs.img: mkfs README $(UPROGS)
+ 	./mkfs fs.img README $(UPROGS)
+@@ -217,7 +218,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
+ 	then echo "-gdb tcp::$(GDBPORT)"; \
+ 	else echo "-s -p $(GDBPORT)"; fi)
+ ifndef CPUS
+-CPUS := 2
++CPUS := 1
+ endif
+ QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA)
+ 
+diff --git a/defs.h b/defs.h
+index 82fb982..98607d7 100644
+--- a/defs.h
++++ b/defs.h
+@@ -120,6 +120,7 @@ void            userinit(void);
+ int             wait(void);
+ void            wakeup(void*);
+ void            yield(void);
++void            set_prior(int); // cs153 lab2 part2
+ 
+ // swtch.S
+ void            swtch(struct context**, struct context*);
+diff --git a/exec.c b/exec.c
+index b40134f..f290301 100644
+--- a/exec.c
++++ b/exec.c
+@@ -19,6 +19,11 @@ exec(char *path, char **argv)
+   pde_t *pgdir, *oldpgdir;
+   struct proc *curproc = myproc();
+ 
++  // cs153 lab2 part5
++  acquire(&tickslock);
++  curproc->start_time = ticks;
++  release(&tickslock);
++
+   begin_op();
+ 
+   if((ip = namei(path)) == 0){
+diff --git a/lab2_nnguy414.diff b/lab2_nnguy414.diff
+index a2d5927..7e503cc 100644
+--- a/lab2_nnguy414.diff
++++ b/lab2_nnguy414.diff
+@@ -31,6 +31,302 @@ index 82fb982..98607d7 100644
+  
+  // swtch.S
+  void            swtch(struct context**, struct context*);
++diff --git a/lab2_nnguy414.diff b/lab2_nnguy414.diff
++index a2d5927..e69de29 100644
++--- a/lab2_nnguy414.diff
+++++ b/lab2_nnguy414.diff
++@@ -1,291 +0,0 @@
++-diff --git a/Makefile b/Makefile
++-index 09d790c..391353a 100644
++---- a/Makefile
++-+++ b/Makefile
++-@@ -181,6 +181,7 @@ UPROGS=\
++- 	_usertests\
++- 	_wc\
++- 	_zombie\
++-+	_lab2_test\
++- 
++- fs.img: mkfs README $(UPROGS)
++- 	./mkfs fs.img README $(UPROGS)
++-@@ -217,7 +218,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
++- 	then echo "-gdb tcp::$(GDBPORT)"; \
++- 	else echo "-s -p $(GDBPORT)"; fi)
++- ifndef CPUS
++--CPUS := 2
++-+CPUS := 1
++- endif
++- QEMUOPTS = -drive file=fs.img,index=1,media=disk,format=raw -drive file=xv6.img,index=0,media=disk,format=raw -smp $(CPUS) -m 512 $(QEMUEXTRA)
++- 
++-diff --git a/defs.h b/defs.h
++-index 82fb982..98607d7 100644
++---- a/defs.h
++-+++ b/defs.h
++-@@ -120,6 +120,7 @@ void            userinit(void);
++- int             wait(void);
++- void            wakeup(void*);
++- void            yield(void);
++-+void            set_prior(int); // cs153 lab2 part2
++- 
++- // swtch.S
++- void            swtch(struct context**, struct context*);
++-diff --git a/lab2_test.c b/lab2_test.c
++-index c88d7ad..055f418 100644
++---- a/lab2_test.c
++-+++ b/lab2_test.c
++-@@ -7,7 +7,7 @@ int main(int argc, char *argv[])
++- {
++-     PScheduler();
++- 
++--    exit(0);
++-+    exit();
++- }    
++-       
++- int PScheduler(void){
++-@@ -16,21 +16,21 @@ int PScheduler(void){
++-     // 0 is the highest priority. All processes have a default priority of 10
++-     // You can use your own priority range/value setup
++- 
++--    int pid, ret_pid, exit_status;
++-+    int pid, ret_pid;
++-     int i,j,k;
++-   
++--    printf(1, "Testing the priority scheduler and setpriority system call:\n");
++-+    printf(1, "Testing the priority scheduler and set_prior system call:\n");
++-     printf(1, "Assuming that the priorities range between range between 0 to 31\n");
++-     printf(1, "0 is the highest priority. All processes have a default priority of 10\n");
++-     printf(1, " - The parent processes will switch to priority 0\n");
++--    setpriority(0); // Use your own setpriority interface
++-+    set_prior(0); // Use your own setpriority interface
++-     for (i = 0; i < 3; i++) {
++- 	pid = fork();
++- 	if (pid > 0) {
++-             continue;
++-         } else if ( pid == 0) {
++-             printf(1, " - Hello! this is child# %d and I will change my priority to %d \n", getpid(), 60 - 20 * i);
++--            setpriority(30 - 10 * i); // Use your own setpriority interface
++-+            set_prior(30 - 10 * i); // Use your own setpriority interface
++-             for (j = 0; j < 50000; j++) {
++-                 asm("nop");
++-                 for(k = 0; k < 10000; k++) {
++-@@ -38,19 +38,19 @@ int PScheduler(void){
++-                 }
++-             }
++-             printf(1, " - Child #%d with priority %d has finished! \n", getpid(), 30-10*i);		
++--            exit(0);
++-+            exit();
++-         } else {
++-             printf(2," \n Error fork() \n");
++--            exit(-1);
++-+            exit();
++-         }
++-     }
++- 
++-     if(pid > 0) {
++-         for (i = 0; i < 3; i++) {
++--            ret_pid = wait(&exit_status);
++--            printf(1, " - This is the parent: child with PID# %d has finished with status %d \n", ret_pid, exit_status);
++-+            ret_pid = wait();
++-+            printf(1, " - This is the parent: child with PID# %d has finished\n", ret_pid);
++-         }
++--        printf(1, " - If processes with highest priority finished first then its correct. \n");
++-+        printf(1, " - If processes with highest priority finished first then it's correct. \n");
++-     }
++- 			
++-     return 0;
++-diff --git a/proc.c b/proc.c
++-index 806b1b1..421b5b4 100644
++---- a/proc.c
++-+++ b/proc.c
++-@@ -88,6 +88,7 @@ allocproc(void)
++- found:
++-   p->state = EMBRYO;
++-   p->pid = nextpid++;
++-+  p->prior_val = 10; // cs153 lab2 part1
++- 
++-   release(&ptable.lock);
++- 
++-@@ -196,6 +197,7 @@ fork(void)
++-     np->state = UNUSED;
++-     return -1;
++-   }
++-+  np->prior_val = curproc->prior_val; // cs153 lab2 part1
++-   np->sz = curproc->sz;
++-   np->parent = curproc;
++-   *np->tf = *curproc->tf;
++-@@ -325,16 +327,50 @@ scheduler(void)
++-   struct proc *p;
++-   struct cpu *c = mycpu();
++-   c->proc = 0;
++-+  struct proc *p1;  // for the highest priority loop
++-+  struct proc *p2;  // for the decreasing priority loop
++-   
++-   for(;;){
++-     // Enable interrupts on this processor.
++-     sti();
++- 
++--    // Loop over process table looking for process to run.
++-+    struct proc *highest_p; // used to store proc with highest priority
++-+
++-+    // Loop over process table looking for highest priority value.
++-     acquire(&ptable.lock);
++-     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
++--      if(p->state != RUNNABLE)
++-+      if(p->state != RUNNABLE) {
++-         continue;
++-+      }
++-+
++-+      highest_p = p;
++-+
++-+      // Find the highest priority value (0 is highest, 31 is lowest)
++-+      // by comparing highest_p with the rest
++-+      // cs153 lab2 part3
++-+      for(p1 = ptable.proc; p1 < &ptable.proc[NPROC]; p1++){
++-+        if(p1->state != RUNNABLE) {
++-+          continue;
++-+        }
++-+        if(p1->prior_val < highest_p->prior_val) {
++-+          highest_p = p1;
++-+        }
++-+      }
++-+
++-+      p = highest_p;  // current proc now has the highest priority
++-+
++-+      // Decrease priority value (0 is highest, 31 is lowest)
++-+      // for any proc that is not highest_p and whose
++-+      // priority is not already the highest possible
++-+      // cs153 lab2 part4
++-+      for(p2 = ptable.proc; p2 < &ptable.proc[NPROC]; p2++){
++-+        if(p2->state != RUNNABLE) {
++-+          continue;
++-+        }
++-+        if((p2 != highest_p) && (p2->prior_val > 0)) {
++-+          p2->prior_val = p2->prior_val - 1;
++-+        }
++-+      }      
++- 
++-       // Switch to chosen process.  It is the process's job
++-       // to release ptable.lock and then reacquire it
++-@@ -342,6 +378,10 @@ scheduler(void)
++-       c->proc = p;
++-       switchuvm(p);
++-       p->state = RUNNING;
++-+        
++-+      // Increase priority value of running proc (0 is highest, 31 is lowest)
++-+      // cs153 lab2 part4
++-+      //p->prior_val = p->prior_val + 1;
++- 
++-       swtch(&(c->scheduler), p->context);
++-       switchkvm();
++-@@ -351,7 +391,6 @@ scheduler(void)
++-       c->proc = 0;
++-     }
++-     release(&ptable.lock);
++--
++-   }
++- }
++- 
++-@@ -532,3 +571,14 @@ procdump(void)
++-     cprintf("\n");
++-   }
++- }
++-+
++-+// cs153 lab2 part2
++-+// change the priority value of the current proc
++-+void
++-+set_prior(int prior_lvl)
++-+{
++-+  struct proc *curproc = myproc();
++-+
++-+  // legal range of prior_val: [0,31]
++-+  curproc->prior_val = prior_lvl % 32;
++-+}
++-\ No newline at end of file
++-diff --git a/proc.h b/proc.h
++-index 1647114..49e49c8 100644
++---- a/proc.h
++-+++ b/proc.h
++-@@ -49,6 +49,7 @@ struct proc {
++-   struct file *ofile[NOFILE];  // Open files
++-   struct inode *cwd;           // Current directory
++-   char name[16];               // Process name (debugging)
++-+  int prior_val;               // Priority value for scheduler, 0 is highest, 31 is lowest // cs153 lab2 part1
++- };
++- 
++- // Process memory is laid out contiguously, low addresses first:
++-diff --git a/syscall.c b/syscall.c
++-index ee85261..660f273 100644
++---- a/syscall.c
++-+++ b/syscall.c
++-@@ -103,6 +103,7 @@ extern int sys_unlink(void);
++- extern int sys_wait(void);
++- extern int sys_write(void);
++- extern int sys_uptime(void);
++-+extern int sys_set_prior(void); // cs153 lab2 part2
++- 
++- static int (*syscalls[])(void) = {
++- [SYS_fork]    sys_fork,
++-@@ -126,6 +127,7 @@ static int (*syscalls[])(void) = {
++- [SYS_link]    sys_link,
++- [SYS_mkdir]   sys_mkdir,
++- [SYS_close]   sys_close,
++-+[SYS_set_prior] sys_set_prior,  // cs153 lab2 part2
++- };
++- 
++- void
++-diff --git a/syscall.h b/syscall.h
++-index bc5f356..aeb340d 100644
++---- a/syscall.h
++-+++ b/syscall.h
++-@@ -20,3 +20,4 @@
++- #define SYS_link   19
++- #define SYS_mkdir  20
++- #define SYS_close  21
++-+#define SYS_set_prior 22    // cs153 lab2 part2
++-\ No newline at end of file
++-diff --git a/sysproc.c b/sysproc.c
++-index 0686d29..e761a11 100644
++---- a/sysproc.c
++-+++ b/sysproc.c
++-@@ -89,3 +89,17 @@ sys_uptime(void)
++-   release(&tickslock);
++-   return xticks;
++- }
++-+
++-+// cs153 lab2 part2
++-+// change priority value
++-+int
++-+sys_set_prior(void)
++-+{
++-+  int prior_lvl;
++-+  if(argint(0, &prior_lvl) < 0) {
++-+    return -1;
++-+  }
++-+
++-+  set_prior(prior_lvl);
++-+  return 0;
++-+}
++-\ No newline at end of file
++-diff --git a/user.h b/user.h
++-index 4f99c52..cb7f19d 100644
++---- a/user.h
++-+++ b/user.h
++-@@ -23,6 +23,7 @@ int getpid(void);
++- char* sbrk(int);
++- int sleep(int);
++- int uptime(void);
++-+int set_prior(int); // cs153 lab2 part2
++- 
++- // ulib.c
++- int stat(const char*, struct stat*);
++-diff --git a/usys.S b/usys.S
++-index 8bfd8a1..4a4e709 100644
++---- a/usys.S
++-+++ b/usys.S
++-@@ -29,3 +29,4 @@ SYSCALL(getpid)
++- SYSCALL(sbrk)
++- SYSCALL(sleep)
++- SYSCALL(uptime)
++-+SYSCALL(set_prior)
+ diff --git a/lab2_test.c b/lab2_test.c
+ index c88d7ad..055f418 100644
+ --- a/lab2_test.c
+@@ -96,7 +392,7 @@ index c88d7ad..055f418 100644
+  			
+      return 0;
+ diff --git a/proc.c b/proc.c
+-index 806b1b1..421b5b4 100644
++index 806b1b1..0f94d6a 100644
+ --- a/proc.c
+ +++ b/proc.c
+ @@ -88,6 +88,7 @@ allocproc(void)
+@@ -115,7 +411,7 @@ index 806b1b1..421b5b4 100644
+    np->sz = curproc->sz;
+    np->parent = curproc;
+    *np->tf = *curproc->tf;
+-@@ -325,16 +327,50 @@ scheduler(void)
++@@ -325,24 +327,64 @@ scheduler(void)
+    struct proc *p;
+    struct cpu *c = mycpu();
+    c->proc = 0;
+@@ -150,7 +446,7 @@ index 806b1b1..421b5b4 100644
+ +          highest_p = p1;
+ +        }
+ +      }
+-+
++ 
+ +      p = highest_p;  // current proc now has the highest priority
+ +
+ +      // Decrease priority value (0 is highest, 31 is lowest)
+@@ -164,22 +460,27 @@ index 806b1b1..421b5b4 100644
+ +        if((p2 != highest_p) && (p2->prior_val > 0)) {
+ +          p2->prior_val = p2->prior_val - 1;
+ +        }
+-+      }      
+- 
+++      }
+++
+++      // Increase priority value of running proc (0 is highest, 31 is lowest)
+++      // cs153 lab2 part4
+++      if(p->prior_val < 31) {
+++        p->prior_val = p->prior_val + 1;
+++      }
+++       
+        // Switch to chosen process.  It is the process's job
+        // to release ptable.lock and then reacquire it
+-@@ -342,6 +378,10 @@ scheduler(void)
++       // before jumping back to us.
+        c->proc = p;
+        switchuvm(p);
+-       p->state = RUNNING;
+-+        
+-+      // Increase priority value of running proc (0 is highest, 31 is lowest)
+-+      // cs153 lab2 part4
+-+      //p->prior_val = p->prior_val + 1;
+- 
++-      p->state = RUNNING;
++-
+++      p->state = RUNNING;      
+++      
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+-@@ -351,7 +391,6 @@ scheduler(void)
++ 
++@@ -351,7 +393,6 @@ scheduler(void)
+        c->proc = 0;
+      }
+      release(&ptable.lock);
+@@ -187,7 +488,7 @@ index 806b1b1..421b5b4 100644
+    }
+  }
+  
+-@@ -532,3 +571,14 @@ procdump(void)
++@@ -532,3 +573,14 @@ procdump(void)
+      cprintf("\n");
+    }
+  }
+diff --git a/lab2_test.c b/lab2_test.c
+index c88d7ad..055f418 100644
+--- a/lab2_test.c
++++ b/lab2_test.c
+@@ -7,7 +7,7 @@ int main(int argc, char *argv[])
+ {
+     PScheduler();
+ 
+-    exit(0);
++    exit();
+ }    
+       
+ int PScheduler(void){
+@@ -16,21 +16,21 @@ int PScheduler(void){
+     // 0 is the highest priority. All processes have a default priority of 10
+     // You can use your own priority range/value setup
+ 
+-    int pid, ret_pid, exit_status;
++    int pid, ret_pid;
+     int i,j,k;
+   
+-    printf(1, "Testing the priority scheduler and setpriority system call:\n");
++    printf(1, "Testing the priority scheduler and set_prior system call:\n");
+     printf(1, "Assuming that the priorities range between range between 0 to 31\n");
+     printf(1, "0 is the highest priority. All processes have a default priority of 10\n");
+     printf(1, " - The parent processes will switch to priority 0\n");
+-    setpriority(0); // Use your own setpriority interface
++    set_prior(0); // Use your own setpriority interface
+     for (i = 0; i < 3; i++) {
+ 	pid = fork();
+ 	if (pid > 0) {
+             continue;
+         } else if ( pid == 0) {
+             printf(1, " - Hello! this is child# %d and I will change my priority to %d \n", getpid(), 60 - 20 * i);
+-            setpriority(30 - 10 * i); // Use your own setpriority interface
++            set_prior(30 - 10 * i); // Use your own setpriority interface
+             for (j = 0; j < 50000; j++) {
+                 asm("nop");
+                 for(k = 0; k < 10000; k++) {
+@@ -38,19 +38,19 @@ int PScheduler(void){
+                 }
+             }
+             printf(1, " - Child #%d with priority %d has finished! \n", getpid(), 30-10*i);		
+-            exit(0);
++            exit();
+         } else {
+             printf(2," \n Error fork() \n");
+-            exit(-1);
++            exit();
+         }
+     }
+ 
+     if(pid > 0) {
+         for (i = 0; i < 3; i++) {
+-            ret_pid = wait(&exit_status);
+-            printf(1, " - This is the parent: child with PID# %d has finished with status %d \n", ret_pid, exit_status);
++            ret_pid = wait();
++            printf(1, " - This is the parent: child with PID# %d has finished\n", ret_pid);
+         }
+-        printf(1, " - If processes with highest priority finished first then its correct. \n");
++        printf(1, " - If processes with highest priority finished first then it's correct. \n");
+     }
+ 			
+     return 0;
+diff --git a/proc.c b/proc.c
+index 806b1b1..a5c0b20 100644
+--- a/proc.c
++++ b/proc.c
+@@ -88,6 +88,9 @@ allocproc(void)
+ found:
+   p->state = EMBRYO;
+   p->pid = nextpid++;
++  p->prior_val = 10;  // cs153 lab2 part1
++  p->start_burst = 0;  // cs153 lab2 part5
++  p->finish_burst = 0;  // cs153 lab2 part5
+ 
+   release(&ptable.lock);
+ 
+@@ -150,6 +153,11 @@ userinit(void)
+ 
+   p->state = RUNNABLE;
+ 
++  // cs153 lab2 part5
++  acquire(&tickslock);
++  p->start_burst = ticks;
++  release(&tickslock);
++
+   release(&ptable.lock);
+ }
+ 
+@@ -196,6 +204,7 @@ fork(void)
+     np->state = UNUSED;
+     return -1;
+   }
++  np->prior_val = curproc->prior_val; // cs153 lab2 part1
+   np->sz = curproc->sz;
+   np->parent = curproc;
+   *np->tf = *curproc->tf;
+@@ -215,6 +224,11 @@ fork(void)
+   acquire(&ptable.lock);
+ 
+   np->state = RUNNABLE;
++  
++  // cs153 lab2 part5
++  acquire(&tickslock);
++  np->start_burst = ticks;
++  release(&tickslock);
+ 
+   release(&ptable.lock);
+ 
+@@ -259,7 +273,20 @@ exit(void)
+       if(p->state == ZOMBIE)
+         wakeup1(initproc);
+     }
+-  }
++  }  
++
++  // cs153 lab2 part5
++  acquire(&tickslock);
++  curproc->finish_time = ticks;
++  release(&tickslock);
++
++  // calculates turnaround time, burst time, and waiting time
++  int turnaround_time = curproc->finish_time - curproc->start_time;
++  int burst_time = curproc->finish_burst - curproc->start_burst;
++  int waiting_time = turnaround_time - burst_time;
++  cprintf("Turnaround time of process with PID# %d is: %d\n" , curproc->pid, turnaround_time);
++  cprintf("Burst time of process with PID# %d is: %d\n" , curproc->pid, burst_time);
++  cprintf("Waiting time of process with PID# %d is: %d\n\n" , curproc->pid, waiting_time);
+ 
+   // Jump into the scheduler, never to return.
+   curproc->state = ZOMBIE;
+@@ -325,17 +352,57 @@ scheduler(void)
+   struct proc *p;
+   struct cpu *c = mycpu();
+   c->proc = 0;
++  struct proc *p1;  // for the highest priority loop
++  struct proc *p2;  // for the decreasing priority loop
+   
+   for(;;){
+     // Enable interrupts on this processor.
+     sti();
+ 
+-    // Loop over process table looking for process to run.
++    struct proc *highest_p; // used to store proc with highest priority
++
++    // Loop over process table looking for highest priority value.
+     acquire(&ptable.lock);
+     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+-      if(p->state != RUNNABLE)
++      if(p->state != RUNNABLE) {
+         continue;
++      }
++
++      highest_p = p;
++
++      // Find the highest priority value (0 is highest, 31 is lowest)
++      // by comparing highest_p with the rest
++      // cs153 lab2 part3
++      for(p1 = ptable.proc; p1 < &ptable.proc[NPROC]; p1++){
++        if(p1->state != RUNNABLE) {
++          continue;
++        }
++        if(p1->prior_val < highest_p->prior_val) {
++          highest_p = p1;
++        }
++      }
+ 
++      p = highest_p;  // current proc now has the highest priority
++
++      // Decrease priority value (0 is highest, 31 is lowest)
++      // for any proc that is not highest_p and whose
++      // priority is not already the highest possible
++      // cs153 lab2 part4
++      for(p2 = ptable.proc; p2 < &ptable.proc[NPROC]; p2++){
++        if(p2->state != RUNNABLE) {
++          continue;
++        }
++        if((p2 != highest_p) && (p2->prior_val > 0)) {
++          p2->prior_val = p2->prior_val - 1;
++        }
++      }
++
++      // Increase priority value of running proc (0 is highest, 31 is lowest)
++      // cs153 lab2 part4
++      if(p->prior_val < 31) {
++        p->prior_val = p->prior_val + 1;
++      }
++       
+       // Switch to chosen process.  It is the process's job
+       // to release ptable.lock and then reacquire it
+       // before jumping back to us.
+@@ -343,6 +410,11 @@ scheduler(void)
+       switchuvm(p);
+       p->state = RUNNING;
+ 
++      // cs153 lab2 part5
++      acquire(&tickslock);
++      p->finish_burst = ticks;
++      release(&tickslock);   
++      
+       swtch(&(c->scheduler), p->context);
+       switchkvm();
+ 
+@@ -351,7 +423,6 @@ scheduler(void)
+       c->proc = 0;
+     }
+     release(&ptable.lock);
+-
+   }
+ }
+ 
+@@ -439,6 +510,11 @@ sleep(void *chan, struct spinlock *lk)
+   p->chan = chan;
+   p->state = SLEEPING;
+ 
++  // cs153 lab2 part5
++  acquire(&tickslock);
++  p->finish_burst = ticks;
++  release(&tickslock);
++
+   sched();
+ 
+   // Tidy up.
+@@ -460,8 +536,15 @@ wakeup1(void *chan)
+   struct proc *p;
+ 
+   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+-    if(p->state == SLEEPING && p->chan == chan)
++    if(p->state == SLEEPING && p->chan == chan) {
+       p->state = RUNNABLE;
++
++      // cs153 lab2 part5
++      acquire(&tickslock);
++      p->start_burst = ticks;
++      release(&tickslock);
++    }
++      
+ }
+ 
+ // Wake up all processes sleeping on chan.
+@@ -486,8 +569,15 @@ kill(int pid)
+     if(p->pid == pid){
+       p->killed = 1;
+       // Wake process from sleep if necessary.
+-      if(p->state == SLEEPING)
++      if(p->state == SLEEPING) {
+         p->state = RUNNABLE;
++
++        // cs153 lab2 part5
++        acquire(&tickslock);
++        p->start_burst = ticks;
++        release(&tickslock);
++      }
++        
+       release(&ptable.lock);
+       return 0;
+     }
+@@ -532,3 +622,14 @@ procdump(void)
+     cprintf("\n");
+   }
+ }
++
++// cs153 lab2 part2
++// change the priority value of the current proc
++void
++set_prior(int prior_lvl)
++{
++  struct proc *curproc = myproc();
++
++  // legal range of prior_val: [0,31]
++  curproc->prior_val = prior_lvl % 32;
++}
+\ No newline at end of file
+diff --git a/proc.h b/proc.h
+index 1647114..fbe2ac6 100644
+--- a/proc.h
++++ b/proc.h
+@@ -49,6 +49,11 @@ struct proc {
+   struct file *ofile[NOFILE];  // Open files
+   struct inode *cwd;           // Current directory
+   char name[16];               // Process name (debugging)
++  int prior_val;               // Priority value for scheduler, 0 is highest, 31 is lowest // cs153 lab2 part1
++  uint start_time;             // Start time from exec() // cs153 lab2 part5
++  uint finish_time;            // Finish time from exit() // cs153 lab2 part5
++  uint start_burst;            // Start burst time // cs153 lab2 part5
++  uint finish_burst;           // Finish burst time // cs153 lab2 part5
+ };
+ 
+ // Process memory is laid out contiguously, low addresses first:
+diff --git a/syscall.c b/syscall.c
+index ee85261..660f273 100644
+--- a/syscall.c
++++ b/syscall.c
+@@ -103,6 +103,7 @@ extern int sys_unlink(void);
+ extern int sys_wait(void);
+ extern int sys_write(void);
+ extern int sys_uptime(void);
++extern int sys_set_prior(void); // cs153 lab2 part2
+ 
+ static int (*syscalls[])(void) = {
+ [SYS_fork]    sys_fork,
+@@ -126,6 +127,7 @@ static int (*syscalls[])(void) = {
+ [SYS_link]    sys_link,
+ [SYS_mkdir]   sys_mkdir,
+ [SYS_close]   sys_close,
++[SYS_set_prior] sys_set_prior,  // cs153 lab2 part2
+ };
+ 
+ void
+diff --git a/syscall.h b/syscall.h
+index bc5f356..aeb340d 100644
+--- a/syscall.h
++++ b/syscall.h
+@@ -20,3 +20,4 @@
+ #define SYS_link   19
+ #define SYS_mkdir  20
+ #define SYS_close  21
++#define SYS_set_prior 22    // cs153 lab2 part2
+\ No newline at end of file
+diff --git a/sysproc.c b/sysproc.c
+index 0686d29..e761a11 100644
+--- a/sysproc.c
++++ b/sysproc.c
+@@ -89,3 +89,17 @@ sys_uptime(void)
+   release(&tickslock);
+   return xticks;
+ }
++
++// cs153 lab2 part2
++// change priority value
++int
++sys_set_prior(void)
++{
++  int prior_lvl;
++  if(argint(0, &prior_lvl) < 0) {
++    return -1;
++  }
++
++  set_prior(prior_lvl);
++  return 0;
++}
+\ No newline at end of file
+diff --git a/user.h b/user.h
+index 4f99c52..cb7f19d 100644
+--- a/user.h
++++ b/user.h
+@@ -23,6 +23,7 @@ int getpid(void);
+ char* sbrk(int);
+ int sleep(int);
+ int uptime(void);
++int set_prior(int); // cs153 lab2 part2
+ 
+ // ulib.c
+ int stat(const char*, struct stat*);
+diff --git a/usys.S b/usys.S
+index 8bfd8a1..4a4e709 100644
+--- a/usys.S
++++ b/usys.S
+@@ -29,3 +29,4 @@ SYSCALL(getpid)
+ SYSCALL(sbrk)
+ SYSCALL(sleep)
+ SYSCALL(uptime)
++SYSCALL(set_prior)
